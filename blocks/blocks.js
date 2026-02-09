@@ -45,22 +45,65 @@ Blockly.Blocks['ph_set_calibration'] = {
   }
 };
 
-// Block 4: Calibrate แบบ 2 จุด
+// Block 4: Calibrate แบบ 3 จุด (แม่นยำสูงสุด)
+Blockly.Blocks['ph_calibrate_three_point'] = {
+  init: function() {
+    this.appendValueInput("pin")
+        .setCheck("Number")
+        .appendField("Calibrate pH 3 จุด ขา");
+    this.appendValueInput("ph4_voltage")
+        .setCheck("Number")
+        .appendField("แรงดัน pH 4.01 (V)");
+    this.appendValueInput("ph7_voltage")
+        .setCheck("Number")
+        .appendField("แรงดัน pH 6.86 (V)");
+    this.appendValueInput("ph9_voltage")
+        .setCheck("Number")
+        .appendField("แรงดัน pH 9.18 (V)");
+    this.setPreviousStatement(true, null);
+    this.setNextStatement(true, null);
+    this.setColour("#27AE60"); // สีเขียว
+    this.setTooltip("Calibrate แบบ 3 จุด (แม่นยำสูงสุด) ใช้ pH 4.01, 6.86, 9.18");
+    this.setHelpUrl("");
+  }
+};
+
+// Block 5: Calibrate แบบ 2 จุด
 Blockly.Blocks['ph_calibrate_two_point'] = {
   init: function() {
     this.appendValueInput("pin")
         .setCheck("Number")
-        .appendField("Calibrate pH ขา");
+        .appendField("Calibrate pH 2 จุด ขา");
     this.appendValueInput("ph4_voltage")
         .setCheck("Number")
-        .appendField("แรงดัน pH 4.0 (V)");
+        .appendField("แรงดัน pH 4.01 (V)");
     this.appendValueInput("ph7_voltage")
         .setCheck("Number")
-        .appendField("แรงดัน pH 7.0 (V)");
+        .appendField("แรงดัน pH 6.86 (V)");
     this.setPreviousStatement(true, null);
     this.setNextStatement(true, null);
-    this.setColour("#27AE60"); // สีเขียว
-    this.setTooltip("Calibrate pH sensor ด้วยสารละลาย pH 4.0 และ pH 7.0");
+    this.setColour("#2ECC71"); // สีเขียวอ่อน
+    this.setTooltip("Calibrate แบบ 2 จุด ใช้ pH 4.01 และ 6.86");
+    this.setHelpUrl("");
+  }
+};
+
+// Block 6: Calibrate แบบ Offset (ง่ายที่สุด)
+Blockly.Blocks['ph_calibrate_offset'] = {
+  init: function() {
+    this.appendValueInput("pin")
+        .setCheck("Number")
+        .appendField("Calibrate pH (Offset) ขา");
+    this.appendValueInput("measured_ph")
+        .setCheck("Number")
+        .appendField("pH ที่วัดได้");
+    this.appendValueInput("actual_ph")
+        .setCheck("Number")
+        .appendField("pH จริง (จากเครื่อง)");
+    this.setPreviousStatement(true, null);
+    this.setNextStatement(true, null);
+    this.setColour("#F39C12"); // สีส้มทอง
+    this.setTooltip("Calibrate แบบง่าย - เทียบกับเครื่องสำเร็จรูป (ปรับ offset)");
     this.setHelpUrl("");
   }
 };
