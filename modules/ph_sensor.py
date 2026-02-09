@@ -67,9 +67,9 @@ class PHSensor:
         # Load calibration
         self._load_calibration()
         print("PH Sensor Ready")
-        print(f"Pin: GPIO {self._pin}")
-        print(f"Slope (m): {self._slope:.2f}")
-        print(f"Intercept (c): {self._intercept:.2f}")
+        print("Pin: GPIO", self._pin)
+        print("Slope (m): %.2f" % self._slope)
+        print("Intercept (c): %.2f" % self._intercept)
         
     def _read_average(self):
         """Read average analog value from multiple samples
