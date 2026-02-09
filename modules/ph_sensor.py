@@ -1,12 +1,8 @@
 """
 PH Sensor Module for MicroPython 1.6.0 (ESP32)
-Analog pH Sensor with Linear Calibration
+Arduino-style averaging (remove min/max)
 
-Compatible with:
-- MicroPython 1.6.0
-- ESP32 ADC
-
-Author: Cap_Apiluk
+Author: Cap_Apiluk (modified)
 """
 
 import machine
@@ -33,8 +29,11 @@ class PHSensor:
 
         self._ph_value = 0.0
         self._voltage = 0.0
+        self._raw_adc = 0
 
-        # Safe file path for MicroPython 1.6
+        self._samples = [0] * self.SAMPLE_COUNT
+        self._index = 0
+
         self._cal_file = "ph_calibration.json"
 
     # -------------------------------------------------
@@ -42,7 +41,7 @@ class PHSensor:
     def set_pin(self, pin):
         self._pin = pin
         self._adc = machine.ADC(machine.Pin(pin))
-        self._adc.atten(machine.ADC.ATTN_11DB)
+        self._adc.atten(machine.ADC.ATTN_11DB)   # สำคัญ!
         self._adc.width(machine.ADC.WIDTH_12BIT)
 
     # -------------------------------------------------
@@ -59,20 +58,42 @@ class PHSensor:
 
     # -------------------------------------------------
 
-    def _read_average(self):
-        total = 0
-        for i in range(self.SAMPLE_COUNT):
-            total += self._adc.read()
-            time.sleep_ms(10)
+    def _average_array(self):
+        values = self._samples[:]
 
-        avg = total / self.SAMPLE_COUNT
-        voltage = avg * self._aref / self._adc_range
-        return voltage
+        if len(values) < 5:
+            return sum(values) / len(values)
+
+        min_v = min(values)
+        max_v = max(values)
+
+        total = 0
+        count = 0
+        for v in values:
+            if v != min_v and v != max_v:
+                total += v
+                count += 1
+
+        if count == 0:
+            return sum(values) / len(values)
+
+        return total / count
 
     # -------------------------------------------------
 
     def update(self):
-        self._voltage = self._read_average()
+        # อ่านค่า ADC ดิบ
+        raw = self._adc.read()
+        self._raw_adc = raw
+
+        # เก็บลง buffer
+        self._samples[self._index] = raw
+        self._index = (self._index + 1) % self.SAMPLE_COUNT
+
+        # average แบบ Arduino
+        avg_adc = self._average_array()
+
+        self._voltage = avg_adc * self._aref / self._adc_range
         self._ph_value = self._slope * self._voltage + self._intercept
 
     # -------------------------------------------------
@@ -83,6 +104,11 @@ class PHSensor:
     def get_voltage(self):
         return round(self._voltage, 3)
 
+    def get_raw_adc(self):
+        return self._raw_adc
+
+    # -------------------------------------------------
+    # Calibration
     # -------------------------------------------------
 
     def calibrate_two_point(self, ph4_voltage, ph7_voltage):
@@ -97,21 +123,16 @@ class PHSensor:
 
         print("=" * 40)
         print("Two-Point Calibration Done")
-        print("pH 4.0 voltage: %.3f V" % ph4_voltage)
-        print("pH 7.0 voltage: %.3f V" % ph7_voltage)
         print("Slope (m): %.4f" % self._slope)
         print("Intercept (c): %.4f" % self._intercept)
         print("=" * 40)
 
         return True
 
-    # -------------------------------------------------
-
     def set_calibration(self, slope, intercept):
         self._slope = float(slope)
         self._intercept = float(intercept)
         self._save_calibration()
-        print("Calibration set")
 
     def get_calibration(self):
         return (self._slope, self._intercept)
@@ -120,12 +141,11 @@ class PHSensor:
 
     def _save_calibration(self):
         try:
-            data = {
+            f = open(self._cal_file, "w")
+            json.dump({
                 "slope": self._slope,
                 "intercept": self._intercept
-            }
-            f = open(self._cal_file, "w")
-            json.dump(data, f)
+            }, f)
             f.close()
         except:
             print("Warning: cannot save calibration")
@@ -143,21 +163,11 @@ class PHSensor:
 
     # -------------------------------------------------
 
-    def reset_calibration(self):
-        self._slope = -6.80
-        self._intercept = 25.85
-        self._save_calibration()
-
-    # -------------------------------------------------
-
     def print_info(self):
         print("=" * 40)
-        print("pH Sensor Info")
-        print("Pin:", self._pin)
+        print("ADC raw:", self._raw_adc)
         print("Voltage: %.3f V" % self._voltage)
         print("pH: %.2f" % self._ph_value)
-        print("Slope: %.4f" % self._slope)
-        print("Intercept: %.4f" % self._intercept)
         print("=" * 40)
 
 
@@ -174,54 +184,9 @@ def init(pin=35):
     _sensor.begin()
     return _sensor
 
-def get_ph_value(pin=35):
-    global _sensor
-    if _sensor is None or _sensor._pin != pin:
-        init(pin)
-    _sensor.update()
-    return _sensor.get_ph_value()
-
-def get_voltage(pin=35):
-    global _sensor
-    if _sensor is None or _sensor._pin != pin:
-        init(pin)
-    _sensor.update()
-    return _sensor.get_voltage()
-
-def set_calibration(slope, intercept):
-    global _sensor
-    if _sensor is None:
-        init()
-    _sensor.set_calibration(slope, intercept)
-
-def get_calibration():
-    global _sensor
-    if _sensor is None:
-        init()
-    return _sensor.get_calibration()
-
-def calibrate_two_point(pin, v4, v7):
-    global _sensor
-    if _sensor is None or _sensor._pin != pin:
-        init(pin)
-    return _sensor.calibrate_two_point(v4, v7)
-
 def print_readings(pin=35):
     global _sensor
     if _sensor is None or _sensor._pin != pin:
         init(pin)
     _sensor.update()
     _sensor.print_info()
-
-def read_all_values(pin=35):
-    global _sensor
-    if _sensor is None or _sensor._pin != pin:
-        init(pin)
-    _sensor.update()
-    cal = _sensor.get_calibration()
-    return {
-        "ph": _sensor.get_ph_value(),
-        "voltage": _sensor.get_voltage(),
-        "slope": cal[0],
-        "intercept": cal[1]
-    }
