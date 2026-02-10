@@ -4,7 +4,7 @@
     author: "Cap_Apiluk",
     category: "Sensor",
     version: "1.0.0",
-    icon: "/static/icon.png",
+    icon: "/static/ph-sensor.png",
     color: "#E74C3C",
     blocks: [
         // Block 1: อ่านค่า pH
