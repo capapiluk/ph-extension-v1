@@ -21,6 +21,7 @@ class PHSensor:
     - Median filtering (10 samples)
     - Linear calibration (y = mx + c)
     - Auto-save calibration
+    - Three calibration methods: 2-point, 3-point, offset
     """
     
     # Constants
@@ -100,7 +101,12 @@ class PHSensor:
         return round(self._voltage, 3)
     
     def calibrate_two_point(self, ph4_voltage, ph7_voltage):
-        """Calibrate using two-point calibration"""
+        """Calibrate using two-point calibration
+        
+        Args:
+            ph4_voltage: Voltage reading at pH 4.0
+            ph7_voltage: Voltage reading at pH 7.0
+        """
         # Calculate slope
         if ph7_voltage == ph4_voltage:
             print("Error: Same voltage for both points!")
@@ -121,6 +127,93 @@ class PHSensor:
         print("pH 7.0 voltage:  " + str(round(ph7_voltage, 3)) + " V")
         print("New Slope (m):   " + str(round(self._slope, 4)))
         print("New Intercept (c): " + str(round(self._intercept, 4)))
+        print("=" * 50)
+        
+        return True
+    
+    def calibrate_three_point(self, ph1_voltage, ph2_voltage, ph3_voltage, 
+                            ph1_value=4.0, ph2_value=7.0, ph3_value=9.0):
+        """Calibrate using three-point calibration (best fit line)
+        
+        Uses least squares method to find best slope and intercept
+        
+        Args:
+            ph1_voltage: Voltage reading at first pH point
+            ph2_voltage: Voltage reading at second pH point
+            ph3_voltage: Voltage reading at third pH point
+            ph1_value: Actual pH value of first buffer (default: 4.0)
+            ph2_value: Actual pH value of second buffer (default: 7.0)
+            ph3_value: Actual pH value of third buffer (default: 9.0)
+        """
+        # Check for duplicate voltages
+        if (ph1_voltage == ph2_voltage or ph2_voltage == ph3_voltage or 
+            ph1_voltage == ph3_voltage):
+            print("Error: Duplicate voltages detected!")
+            return False
+        
+        # Three points: (V, pH)
+        x_vals = [ph1_voltage, ph2_voltage, ph3_voltage]
+        y_vals = [ph1_value, ph2_value, ph3_value]
+        
+        # Calculate means
+        x_mean = sum(x_vals) / 3.0
+        y_mean = sum(y_vals) / 3.0
+        
+        # Calculate slope using least squares
+        numerator = 0
+        denominator = 0
+        for i in range(3):
+            numerator += (x_vals[i] - x_mean) * (y_vals[i] - y_mean)
+            denominator += (x_vals[i] - x_mean) * (x_vals[i] - x_mean)
+        
+        if denominator == 0:
+            print("Error: Cannot calculate slope!")
+            return False
+        
+        self._slope = numerator / denominator
+        self._intercept = y_mean - self._slope * x_mean
+        
+        # Save calibration
+        self._save_calibration()
+        
+        print("=" * 50)
+        print("Three-Point Calibration Complete!")
+        print("=" * 50)
+        print("pH " + str(ph1_value) + " voltage:  " + str(round(ph1_voltage, 3)) + " V")
+        print("pH " + str(ph2_value) + " voltage:  " + str(round(ph2_voltage, 3)) + " V")
+        print("pH " + str(ph3_value) + " voltage:  " + str(round(ph3_voltage, 3)) + " V")
+        print("New Slope (m):   " + str(round(self._slope, 4)))
+        print("New Intercept (c): " + str(round(self._intercept, 4)))
+        print("=" * 50)
+        
+        return True
+    def calibrate_offset(self, measured_ph, actual_ph):
+        """Calibrate using offset method (single point)
+        
+        Adjusts intercept only, keeps slope the same
+        Useful for quick calibration with one buffer solution
+        
+        Args:
+            measured_ph: pH value that sensor currently reads
+            actual_ph: Actual pH value of the buffer solution
+        """
+        # Calculate the offset
+        offset = actual_ph - measured_ph
+        
+        # Adjust intercept only (slope stays the same)
+        self._intercept = self._intercept + offset
+        
+        # Save calibration
+        self._save_calibration()
+        
+        print("=" * 50)
+        print("Offset Calibration Complete!")
+        print("=" * 50)
+        print("Measured pH:      " + str(round(measured_ph, 2)))
+        print("Actual pH:        " + str(round(actual_ph, 2)))
+        print("Offset:           " + str(round(offset, 2)))
+        print("New Intercept (c): " + str(round(self._intercept, 4)))
+        print("Slope (m):        " + str(round(self._slope, 4)) + " (unchanged)")
         print("=" * 50)
         
         return True
@@ -236,6 +329,22 @@ def calibrate_two_point(pin, ph4_voltage, ph7_voltage):
     
     return _sensor.calibrate_two_point(ph4_voltage, ph7_voltage)
 
+def calibrate_three_point(pin, ph4_voltage, ph7_voltage, ph9_voltage):
+    """Three-point calibration"""
+    global _sensor
+    if _sensor is None or _sensor._pin != pin:
+        init(pin)
+    
+    return _sensor.calibrate_three_point(ph4_voltage, ph7_voltage, ph9_voltage)
+
+def calibrate_offset(pin, measured_ph, actual_ph):
+    """Offset calibration"""
+    global _sensor
+    if _sensor is None or _sensor._pin != pin:
+        init(pin)
+    
+    return _sensor.calibrate_offset(measured_ph, actual_ph)
+
 def print_readings(pin):
     """Print all sensor readings"""
     global _sensor
@@ -261,134 +370,3 @@ def read_all_values(pin):
         'slope': slope,
         'intercept': intercept
     }
-
-
-# ========================================
-# Example Usage
-# ========================================
-"""
-#############################################
-# Example 1: Simple Usage
-#############################################
-
-import ph_sensor
-
-# Read pH value
-ph = ph_sensor.get_ph_value(35)
-print("pH: " + str(ph))
-
-
-#############################################
-# Example 2: Arduino Style (Class API)
-#############################################
-
-import ph_sensor
-import time
-
-# Setup
-sensor = ph_sensor.init(pin=35)
-
-# Loop
-while True:
-    sensor.update()
-    ph = sensor.get_ph_value()
-    voltage = sensor.get_voltage()
-    
-    print("Voltage: " + str(voltage) + " V | pH: " + str(ph))
-    time.sleep(1)
-
-
-#############################################
-# Example 3: Two-Point Calibration
-#############################################
-
-import ph_sensor
-
-# Initialize
-sensor = ph_sensor.init(pin=35)
-
-# Step 1: Put sensor in pH 4.0 buffer, wait 30 seconds
-sensor.update()
-ph4_voltage = sensor.get_voltage()
-print("pH 4.0 voltage: " + str(ph4_voltage))
-
-# Step 2: Rinse sensor, put in pH 7.0 buffer, wait 30 seconds
-sensor.update()
-ph7_voltage = sensor.get_voltage()
-print("pH 7.0 voltage: " + str(ph7_voltage))
-
-# Step 3: Calibrate
-sensor.calibrate_two_point(ph4_voltage, ph7_voltage)
-
-
-#############################################
-# Example 4: Set Calibration Manually
-#############################################
-
-import ph_sensor
-
-# If you know your calibration values
-ph_sensor.set_calibration(slope=-5.70, intercept=21.34)
-
-# Then read pH
-ph = ph_sensor.get_ph_value(35)
-
-
-#############################################
-# Example 5: Hydroponics pH Control
-#############################################
-
-import ph_sensor
-import machine
-import time
-
-# Setup
-sensor = ph_sensor.init(pin=35)
-pump_ph_down = machine.Pin(26, machine.Pin.OUT)
-pump_ph_up = machine.Pin(27, machine.Pin.OUT)
-
-# Target pH range
-TARGET_PH_MIN = 5.5
-TARGET_PH_MAX = 6.5
-
-while True:
-    sensor.update()
-    ph = sensor.get_ph_value()
-    
-    print("pH: " + str(ph), end=" ")
-    
-    if ph < TARGET_PH_MIN:
-        print("pH too low - Add pH UP")
-        pump_ph_up.on()
-        time.sleep(2)
-        pump_ph_up.off()
-        
-    elif ph > TARGET_PH_MAX:
-        print("pH too high - Add pH DOWN")
-        pump_ph_down.on()
-        time.sleep(2)
-        pump_ph_down.off()
-        
-    else:
-        print("pH optimal")
-    
-    time.sleep(300)  # Check every 5 minutes
-
-
-#############################################
-# pH Ranges for Reference
-#############################################
-
-# Hydroponics:
-# - Lettuce, Herbs: 5.5-6.5
-# - Tomatoes: 5.5-6.5
-# - Most vegetables: 5.5-6.5
-
-# Aquarium:
-# - Freshwater fish: 6.5-7.5
-# - Marine fish: 8.0-8.4
-
-# Drinking water:
-# - Safe range: 6.5-8.5
-# - Ideal: 7.0-8.0
-"""
