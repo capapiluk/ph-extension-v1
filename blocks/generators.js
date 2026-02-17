@@ -27,7 +27,7 @@ Blockly.Python['ph_set_calibration'] = function(block) {
     var intercept = Blockly.Python.valueToCode(block, 'intercept', Blockly.Python.ORDER_ATOMIC) || '18.5';
     
     var code = 'ph_sensor.set_calibration(' + slope + ', ' + intercept + ')\n';
-    return code;
+    return code; 
 };
 
 // Generator 4: Calibrate แบบ 3 จุด
