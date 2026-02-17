@@ -35,12 +35,23 @@ class PHSensor:
         self._adc_range = 4095
         
         # Calibration parameters (y = mx + c)
-        self._slope = -6.80
-        self._intercept = 25.85
+        # Default สำหรับ pH 4.01 และ pH 6.86 buffer
+        self._slope = -3.5        # Slope ที่เหมาะสมสำหรับ pH 4.01-6.86
+        self._intercept = 18.5    # Intercept ที่เหมาะสมสำหรับ pH buffer มาตรฐาน
         
         # pH value
         self._ph_value = 0.0
         self._voltage = 0.0
+        
+        # Error detection
+        self._sensor_status = "unknown"
+        self._error_message = ""
+        
+        # Voltage thresholds for error detection
+        # หาก pH buffer 4.0 ให้แรงดันสูงเกิน 3.3V 
+        # สามารถหมุนตัวต้านทาน (potentiometer) ลงเพื่อลดแรงดันได้
+        # *** สำคัญ: หลังปรับตัวต้านทานแล้ว ต้อง calibrate ใหม่เสมอ ***
+        self._max_valid_voltage = 3.3   # ESP32 VREF = 3.3V, above this = sensor dry
         
         # Calibration file
         self._cal_file = "/ph_calibration.json"
@@ -65,12 +76,13 @@ class PHSensor:
         print("Intercept (c): " + str(round(self._intercept, 2)))
         
     def _read_average(self):
-        """Read average analog value from multiple samples"""
+        """Read average analog value from multiple samples with basic error detection"""
         total = 0
         
         # Take multiple samples
         for _ in range(self.SAMPLE_COUNT):
-            total += self._adc.read()
+            raw = self._adc.read()
+            total += raw
             time.sleep_ms(10)
         
         # Calculate average
@@ -78,6 +90,9 @@ class PHSensor:
         
         # Convert to voltage
         voltage = avg * self._aref / self._adc_range
+        
+        # Simple sensor check
+        self._check_sensor_status(voltage)
         
         return voltage
     
@@ -100,22 +115,26 @@ class PHSensor:
         """Get current voltage reading"""
         return round(self._voltage, 3)
     
-    def calibrate_two_point(self, ph4_voltage, ph7_voltage):
-        """Calibrate using two-point calibration
+    def calibrate_two_point(self, ph401_voltage, ph686_voltage):
+        """Calibrate using two-point calibration with standard pH buffers
+        
+        Uses standard pH buffer values: 4.01 and 6.86
+        More accurate and stable than older buffer combinations
         
         Args:
-            ph4_voltage: Voltage reading at pH 4.0
-            ph7_voltage: Voltage reading at pH 7.0
+            ph401_voltage: Voltage reading at pH 4.01 buffer
+            ph686_voltage: Voltage reading at pH 6.86 buffer
         """
-        # Calculate slope
-        if ph7_voltage == ph4_voltage:
+        # Check for same voltage (would cause division by zero)
+        if ph686_voltage == ph401_voltage:
             print("Error: Same voltage for both points!")
             return False
         
-        self._slope = (7.0 - 4.0) / (ph7_voltage - ph4_voltage)
+        # Calculate slope using standard pH values
+        self._slope = (6.86 - 4.01) / (ph686_voltage - ph401_voltage)
         
         # Calculate intercept
-        self._intercept = 4.0 - self._slope * ph4_voltage
+        self._intercept = 4.01 - self._slope * ph401_voltage
         
         # Save calibration
         self._save_calibration()
@@ -123,27 +142,28 @@ class PHSensor:
         print("=" * 50)
         print("Two-Point Calibration Complete!")
         print("=" * 50)
-        print("pH 4.0 voltage:  " + str(round(ph4_voltage, 3)) + " V")
-        print("pH 7.0 voltage:  " + str(round(ph7_voltage, 3)) + " V")
-        print("New Slope (m):   " + str(round(self._slope, 4)))
+        print("pH 4.01 voltage:  " + str(round(ph401_voltage, 3)) + " V")
+        print("pH 6.86 voltage:  " + str(round(ph686_voltage, 3)) + " V")
+        print("New Slope (m):    " + str(round(self._slope, 4)))
         print("New Intercept (c): " + str(round(self._intercept, 4)))
         print("=" * 50)
         
         return True
     
     def calibrate_three_point(self, ph1_voltage, ph2_voltage, ph3_voltage, 
-                            ph1_value=4.0, ph2_value=7.0, ph3_value=9.0):
+                            ph1_value=4.01, ph2_value=6.86, ph3_value=9.18):
         """Calibrate using three-point calibration (best fit line)
         
         Uses least squares method to find best slope and intercept
+        Uses standard pH buffer values: 4.01, 6.86, 9.18
         
         Args:
-            ph1_voltage: Voltage reading at first pH point
-            ph2_voltage: Voltage reading at second pH point
-            ph3_voltage: Voltage reading at third pH point
-            ph1_value: Actual pH value of first buffer (default: 4.0)
-            ph2_value: Actual pH value of second buffer (default: 7.0)
-            ph3_value: Actual pH value of third buffer (default: 9.0)
+            ph1_voltage: Voltage reading at pH 4.01 buffer
+            ph2_voltage: Voltage reading at pH 6.86 buffer  
+            ph3_voltage: Voltage reading at pH 9.18 buffer
+            ph1_value: Actual pH value of first buffer (default: 4.01)
+            ph2_value: Actual pH value of second buffer (default: 6.86)
+            ph3_value: Actual pH value of third buffer (default: 9.18)
         """
         # Check for duplicate voltages
         if (ph1_voltage == ph2_voltage or ph2_voltage == ph3_voltage or 
@@ -247,29 +267,52 @@ class PHSensor:
         try:
             with open(self._cal_file, 'r') as f:
                 data = json.load(f)
-                self._slope = data.get('slope', -6.80)
-                self._intercept = data.get('intercept', 25.85)
+                self._slope = data.get('slope', -3.5)
+                self._intercept = data.get('intercept', 18.5)
                 print("Loaded calibration: m=" + str(round(self._slope, 2)) + ", c=" + str(round(self._intercept, 2)))
         except:
             print("No calibration file found, using default values")
-            self._slope = -6.80
-            self._intercept = 25.85
+            # Default สำหรับ pH buffer มาตรฐาน 4.01 และ 6.86
+            self._slope = -3.5
+            self._intercept = 18.5
     
     def reset_calibration(self):
-        """Reset to default calibration"""
-        self._slope = -6.80
-        self._intercept = 25.85
+        """Reset to default calibration for standard pH buffers"""
+        self._slope = -3.5
+        self._intercept = 18.5
         self._save_calibration()
-        print("Calibration reset to default")
+        print("Calibration reset to default (optimized for pH 4.01 & 6.86 buffers)")
+    
+    def _check_sensor_status(self, voltage):
+        """Simple sensor status check"""
+        # Check if sensor is dry (not in solution)
+        if voltage > self._max_valid_voltage:
+            self._sensor_status = "error"
+            self._error_message = "Sensor not in solution (" + str(round(voltage, 2)) + "V) - Please submerge electrode"
+        else:
+            # Sensor looks OK
+            self._sensor_status = "ok"
+            self._error_message = ""
+    
+    def get_sensor_status(self):
+        """Get sensor status and error message"""
+        return (self._sensor_status, self._error_message)
+    
+    def is_sensor_ok(self):
+        """Check if sensor is working properly"""
+        return self._sensor_status == "ok"
     
     def print_info(self):
-        """Print sensor information"""
+        """Print sensor information with status"""
         print("=" * 50)
         print("pH Sensor Readings")
         print("=" * 50)
         print("Pin:              GPIO " + str(self._pin))
         print("Voltage:          " + str(round(self._voltage, 3)) + " V")
         print("pH:               " + str(round(self._ph_value, 2)))
+        print("Status:           " + self._sensor_status.upper())
+        if self._error_message:
+            print("Message:          " + self._error_message)
         print("Slope (m):        " + str(round(self._slope, 4)))
         print("Intercept (c):    " + str(round(self._intercept, 4)))
         print("=" * 50)
@@ -321,21 +364,21 @@ def get_calibration():
         init()
     return _sensor.get_calibration()
 
-def calibrate_two_point(pin, ph4_voltage, ph7_voltage):
-    """Two-point calibration"""
+def calibrate_two_point(pin, ph401_voltage, ph686_voltage):
+    """Two-point calibration with standard pH buffers"""
     global _sensor
     if _sensor is None or _sensor._pin != pin:
         init(pin)
     
-    return _sensor.calibrate_two_point(ph4_voltage, ph7_voltage)
+    return _sensor.calibrate_two_point(ph401_voltage, ph686_voltage)
 
-def calibrate_three_point(pin, ph4_voltage, ph7_voltage, ph9_voltage):
-    """Three-point calibration"""
+def calibrate_three_point(pin, ph401_voltage, ph686_voltage, ph918_voltage):
+    """Three-point calibration with standard pH buffers"""
     global _sensor
     if _sensor is None or _sensor._pin != pin:
         init(pin)
     
-    return _sensor.calibrate_three_point(ph4_voltage, ph7_voltage, ph9_voltage)
+    return _sensor.calibrate_three_point(ph401_voltage, ph686_voltage, ph918_voltage)
 
 def calibrate_offset(pin, measured_ph, actual_ph):
     """Offset calibration"""
@@ -370,3 +413,43 @@ def read_all_values(pin):
         'slope': slope,
         'intercept': intercept
     }
+
+def is_sensor_ok(pin):
+    """Check if sensor is working properly"""
+    global _sensor
+    if _sensor is None or _sensor._pin != pin:
+        init(pin)
+    
+    _sensor.update()
+    return _sensor.is_sensor_ok()
+
+def get_sensor_status(pin):
+    """Get sensor status and error message"""
+    global _sensor
+    if _sensor is None or _sensor._pin != pin:
+        init(pin)
+    
+    _sensor.update()
+    status, message = _sensor.get_sensor_status()
+    return {
+        'status': status,
+        'message': message
+    }
+
+def check_sensor(pin):
+    """Check sensor and print status"""
+    global _sensor
+    if _sensor is None or _sensor._pin != pin:
+        init(pin)
+    
+    _sensor.update()
+    status, message = _sensor.get_sensor_status()
+    
+    if status == "ok":
+        print("✅ Sensor OK - pH: " + str(round(_sensor.get_ph_value(), 2)))
+    elif status == "warning":  
+        print("⚠️  Warning: " + message)
+    else:  # error
+        print("❌ Error: " + message)
+    
+    return status == "ok"

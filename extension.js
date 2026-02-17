@@ -1,6 +1,6 @@
 ({
     name: "pH Sensor",
-    description: "Analog pH Sensor with Two-Point Calibration (pH 4.0 & 7.0)",
+    description: "Analog pH Sensor with Standard pH Buffer Calibration (pH 4.01 & 6.86)",
     author: "Cap_Apiluk",
     category: "Sensor",
     version: "1.0.0",
@@ -37,12 +37,12 @@
                 <block type="ph_set_calibration">
                     <value name="slope">
                         <shadow type="math_number">
-                            <field name="NUM">-6.80</field>
+                            <field name="NUM">-3.5</field>
                         </shadow>
                     </value>
                     <value name="intercept">
                         <shadow type="math_number">
-                            <field name="NUM">25.85</field>
+                            <field name="NUM">18.5</field>
                         </shadow>
                     </value>
                 </block>
@@ -57,19 +57,19 @@
                             <field name="NUM">35</field>
                         </shadow>
                     </value>
-                    <value name="ph4_voltage">
+                    <value name="ph401_voltage">
                         <shadow type="math_number">
-                            <field name="NUM">2.5</field>
+                            <field name="NUM">2.8</field>
                         </shadow>
                     </value>
-                    <value name="ph7_voltage">
+                    <value name="ph686_voltage">
                         <shadow type="math_number">
-                            <field name="NUM">2.0</field>
+                            <field name="NUM">2.1</field>
                         </shadow>
                     </value>
-                    <value name="ph9_voltage">
+                    <value name="ph918_voltage">
                         <shadow type="math_number">
-                            <field name="NUM">1.5</field>
+                            <field name="NUM">1.4</field>
                         </shadow>
                     </value>
                 </block>
@@ -84,14 +84,14 @@
                             <field name="NUM">35</field>
                         </shadow>
                     </value>
-                    <value name="ph4_voltage">
+                    <value name="ph401_voltage">
                         <shadow type="math_number">
-                            <field name="NUM">2.5</field>
+                            <field name="NUM">2.8</field>
                         </shadow>
                     </value>
-                    <value name="ph7_voltage">
+                    <value name="ph686_voltage">
                         <shadow type="math_number">
-                            <field name="NUM">2.0</field>
+                            <field name="NUM">2.1</field>
                         </shadow>
                     </value>
                 </block>
@@ -156,6 +156,30 @@
                     <value name="ph">
                         <shadow type="math_number">
                             <field name="NUM">7.0</field>
+                        </shadow>
+                    </value>
+                </block>
+            `
+        },
+        // Block 11: ตรวจสอบสถานะ Sensor
+        {
+            xml: `
+                <block type="ph_check_sensor">
+                    <value name="pin">
+                        <shadow type="math_number">
+                            <field name="NUM">35</field>
+                        </shadow>
+                    </value>
+                </block>
+            `
+        },
+        // Block 12: แสดงสถานะ Sensor
+        {
+            xml: `
+                <block type="ph_show_sensor_status">
+                    <value name="pin">
+                        <shadow type="math_number">
+                            <field name="NUM">35</field>
                         </shadow>
                     </value>
                 </block>

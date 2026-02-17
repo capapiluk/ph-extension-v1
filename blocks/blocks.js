@@ -51,13 +51,13 @@ Blockly.Blocks['ph_calibrate_three_point'] = {
     this.appendValueInput("pin")
         .setCheck("Number")
         .appendField("Calibrate pH 3 จุด ขา");
-    this.appendValueInput("ph4_voltage")
+    this.appendValueInput("ph401_voltage")
         .setCheck("Number")
         .appendField("แรงดัน pH 4.01 (V)");
-    this.appendValueInput("ph7_voltage")
+    this.appendValueInput("ph686_voltage")
         .setCheck("Number")
         .appendField("แรงดัน pH 6.86 (V)");
-    this.appendValueInput("ph9_voltage")
+    this.appendValueInput("ph918_voltage")
         .setCheck("Number")
         .appendField("แรงดัน pH 9.18 (V)");
     this.setPreviousStatement(true, null);
@@ -74,10 +74,10 @@ Blockly.Blocks['ph_calibrate_two_point'] = {
     this.appendValueInput("pin")
         .setCheck("Number")
         .appendField("Calibrate pH 2 จุด ขา");
-    this.appendValueInput("ph4_voltage")
+    this.appendValueInput("ph401_voltage")
         .setCheck("Number")
         .appendField("แรงดัน pH 4.01 (V)");
-    this.appendValueInput("ph7_voltage")
+    this.appendValueInput("ph686_voltage")
         .setCheck("Number")
         .appendField("แรงดัน pH 6.86 (V)");
     this.setPreviousStatement(true, null);
@@ -156,6 +156,32 @@ Blockly.Blocks['ph_check_level'] = {
     this.setOutput(true, "String");
     this.setColour("#16A085"); // สีเขียวน้ำทะเล
     this.setTooltip("คืนค่า: 'กรด', 'กลาง', หรือ 'ด่าง'");
+    this.setHelpUrl("");
+  }
+};
+// Block 11: ตรวจสอบสถานะ Sensor
+Blockly.Blocks['ph_check_sensor'] = {
+  init: function() {
+    this.appendValueInput("pin")
+        .setCheck("Number")
+        .appendField("ตรวจสอบสถานะ pH Sensor ขา");
+    this.setOutput(true, "Boolean");
+    this.setColour("#F39C12"); // สีส้มทอง
+    this.setTooltip("คืนค่า true ถ้า sensor ทำงานปกติ");
+    this.setHelpUrl("");
+  }
+};
+
+// Block 12: แสดงสถานะ Sensor
+Blockly.Blocks['ph_show_sensor_status'] = {
+  init: function() {
+    this.appendValueInput("pin")
+        .setCheck("Number")
+        .appendField("แสดงสถานะ pH Sensor ขา");
+    this.setPreviousStatement(true, null);
+    this.setNextStatement(true, null);
+    this.setColour("#E74C3C"); // สีแดง
+    this.setTooltip("แสดงข้อความสถานะ sensor");
     this.setHelpUrl("");
   }
 };
